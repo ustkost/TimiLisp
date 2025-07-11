@@ -9,6 +9,17 @@ import Eval (Map, eval)
 --   print x
 --   printExprs xs
 
+prettyPrint :: Expr -> String
+prettyPrint (Atom x) = x
+prettyPrint (Number x) = show x
+prettyPrint (StringLit x) = x
+prettyPrint (List x) = "(" ++ go x ++ ")"
+  where
+    go :: [Expr] -> String
+    go [] = ""
+    go [x] = prettyPrint x
+    go (x:xs) = prettyPrint x ++ " " ++ go xs
+
 repl :: Map -> IO ()
 repl env = do
   putStr "TimiLisp> "
@@ -17,7 +28,7 @@ repl env = do
     tokens = lexer input
     expr = parser tokens [] !! 0
     (res, newEnv) = eval (expr, env)
-  print res
+  putStrLn $ prettyPrint res
   repl newEnv
 
 -- repl :: Map -> IO Map

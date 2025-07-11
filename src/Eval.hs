@@ -17,6 +17,7 @@ setVar (x:xs) name value
   | otherwise = x : setVar xs name value
 
 eval :: (Expr, Map) -> (Expr, Map)
+eval ((Atom "T"), m) = (Atom "T", m)
 eval ((Atom "nil"), m) = (Atom "nil", m)
 eval ((Atom s), m) = (getVar m s, m)
 eval ((Number n), m) = (Number n, m)
@@ -50,5 +51,25 @@ eval ((List ((Atom "numberp"):_)), m) = (Atom "nil", m)
 eval ((List [(Atom "listp"), (List _)]), m) = (Atom "T", m)
 eval ((List ((Atom "listp"):_)), m) = (Atom "nil", m)
 
-eval ((List [(Atom "car"), (List (x:xs))]), m) = eval (x, m)
-eval ((List [(Atom "car"), (List (x:xs))]), m) = eval (x, m)
+eval ((List [(Atom "car"), expr]), m) = (head e, newM)
+  where
+    ((List e), newM) = eval (expr, m)
+
+eval ((List [(Atom "cdr"), expr]), m) = (List (tail e), newM)
+  where
+    ((List e), newM) = eval (expr, m)
+
+eval ((List [(Atom "="), lhs, rhs]), m) = (go (eval (lhs, m)) (eval (rhs, m)), m)
+  where
+    go (Number a, _) (Number b, _)
+      | a == b = Atom "T"
+      | otherwise = Atom "nil"
+    go _ _ = Atom "nil"
+
+eval ((List [(Atom "quote"), x]), m) = (x, m)
+
+eval (List ((Atom "list"):xs), m) = (List (go xs), m)
+  where
+    go :: [Expr] -> [Expr]
+    go [] = []
+    go (x:xs) = fst (eval (x, m)) : go xs

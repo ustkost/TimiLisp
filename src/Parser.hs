@@ -1,14 +1,7 @@
+module Parser (parser, Expr(..)) where 
+
 import Lexer
 import Text.Read hiding (Number)
-
-main :: IO ()
-main = do
-  x <- getLine
-  let tokens = lexer x
-  -- print tokens
-  print (parser tokens [])
-
-type Error = String
 
 data Expr
   = Atom String

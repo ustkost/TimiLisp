@@ -1,5 +1,4 @@
-module Lexer (lexer)
-  where
+module Lexer (lexer) where
     lexer :: String -> [String]
     lexer [] = []
     lexer ('"':cs) = 

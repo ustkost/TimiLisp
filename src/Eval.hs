@@ -73,3 +73,8 @@ eval (List ((Atom "list"):xs), m) = (List (go xs), m)
     go :: [Expr] -> [Expr]
     go [] = []
     go (x:xs) = fst (eval (x, m)) : go xs
+
+eval (List [(Atom "cons"), lhs, rhs], m) = (go (eval (lhs, m)) (eval (rhs, m)), m)
+  where
+    go :: (Expr, Map) -> (Expr, Map) -> Expr
+    go (a, _) (List b, _) = List (a:b)

@@ -14,8 +14,8 @@
 (![timilispik](./kartinka.png))
 
 Наш интерпретатор уже полон по Тьюрингу. Пример расчета факториала:
-> (setf x (quote (cond ((> n 0) (* (+ (setf n (- n 1)) 1) (eval x))) (t 1))))
-> (setf n 5)
-> (eval x)
-120
+> (setf x (quote (cond ((> n 0) (* (+ (setf n (- n 1)) 1) (eval x))) (t 1))))\\
+> (setf n 5)\\
+> (eval x)\\
+120\\
 Юху

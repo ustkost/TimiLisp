@@ -1,7 +1,7 @@
 module Repl (repl) where
 import Lexer (lexer)
 import Parser (Expr(..), parser)
-import Eval (Map, eval)
+import Eval (eval, State)
 
 -- printExprs :: [Expr] -> IO ()
 -- printExprs [] = ()
@@ -13,22 +13,23 @@ prettyPrint :: Expr -> String
 prettyPrint (Atom x) = x
 prettyPrint (Number x) = show x
 prettyPrint (StringLit x) = x
-prettyPrint (List x) = "(" ++ go x ++ ")"
+prettyPrint (Error reason) = "Error: " ++ reason
+prettyPrint (List elems) = "(" ++ go elems ++ ")"
   where
     go :: [Expr] -> String
     go [] = ""
     go [x] = prettyPrint x
     go (x:xs) = prettyPrint x ++ " " ++ go xs
 
-repl :: Map -> IO ()
+repl :: State -> IO ()
 repl env = do
   putStr "TimiLisp> "
   input <- getLine
   let 
     tokens = lexer input
     expr = parser tokens [] !! 0
-    (res, newEnv) = eval (expr, env)
-  putStrLn $ prettyPrint res
+    (res, newEnv) = eval expr env
+  putStrLn (prettyPrint res)
   repl newEnv
 
 -- repl :: Map -> IO Map

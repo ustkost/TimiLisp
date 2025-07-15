@@ -3,4 +3,4 @@ import Repl (repl)
 
 main :: IO ()
 main = do
-  repl []
+  repl ([], [])

@@ -53,7 +53,7 @@ eval (List ((Atom op):args)) state
                                                   in case evald_expr of
                                                     (Error reason) -> (Error reason, state)
                                                     (Number n) -> sumNums exprs state2 (acc + n)
-                                                    _ -> (Error "+'s argument is not a number", state)
+                                                    _ -> (Error ("+'s argument is not a number: " ++ show evald_expr), state)
                 in sumNums args state 0
   | op == "*" = let mulNums :: [Expr] -> State -> Integer -> (Expr, State)
                     mulNums [] state1 acc = (Number acc, state1)
@@ -63,6 +63,77 @@ eval (List ((Atom op):args)) state
                                                     (Number n) -> mulNums exprs state2 (acc * n)
                                                     _ -> (Error ("*'s argument is not a number: " ++ show evald_expr), state)
                 in mulNums args state 1
+  | op == "/" && length args < 2 = (Error "too few arguments to /", state)
+  | op == "/" = let divNums :: [Expr] -> State -> Integer -> (Expr, State)
+                    divNums [] state1 acc = (Number acc, state1)
+                    divNums (expr:exprs) state1 acc = let (evald_expr, state2) = eval expr state1
+                                                  in case evald_expr of
+                                                    (Error reason) -> (Error reason, state)
+                                                    (Number 0) -> (Error ("can't divide by 0"), state)
+                                                    (Number n) -> divNums exprs state2 (acc `div` n)
+                                                    _ -> (Error ("/'s argument is not a number: " ++ show evald_expr), state)
+                in case (eval (head args) state) of
+                  (Number n, state) -> divNums (tail args) state n
+                  (Error reason, state) -> (Error reason, state)
+                  (expression, state) -> (Error ("/'s argument is not a number: " ++ show expression), state)
+  | op == "mod" && length args < 2 = (Error "too few arguments to mod", state)
+  | op == "mod" && length args > 2 = (Error "too many arguments to mod", state)
+  | op == "mod" = let modNums :: [Expr] -> State -> Integer -> (Expr, State)
+                      modNums [] state1 acc = (Number acc, state1)
+                      modNums (expr:exprs) state1 acc = let (evald_expr, state2) = eval expr state1
+                                                    in case evald_expr of
+                                                      (Error reason) -> (Error reason, state)
+                                                      (Number 0) -> (Error ("can't divide by 0"), state)
+                                                      (Number n) -> modNums exprs state2 (acc `mod` n)
+                                                      _ -> (Error ("mod's argument is not a number: " ++ show evald_expr), state)
+                  in case (eval (head args) state) of
+                    (Number n, state) -> modNums (tail args) state n
+                    (Error reason, state) -> (Error reason, state)
+                    (expression, state) -> (Error ("mod's argument is not a number: " ++ show expression), state)
+  | op == "incf" && length args == 0 = (Error "too few arguments to incf", state)
+  | op == "incf" && length args == 1 =  let expr = args !! 0
+                                        in case expr of
+                                          (Atom name) ->  let (evald_expr, state1) = eval expr state
+                                                          in case evald_expr of
+                                                            (Error reason) -> (Error reason, state)
+                                                            (Number n) -> (Number (n + 1), (setVar (fst state1) name (Number (n + 1)), snd state1))
+                                                            _ -> (Error ("incf's argument is not a number: " ++ show evald_expr), state)
+                                          _ -> (Error ("argument is not a variable"), state)
+  | op == "incf" && length args == 2 =  let expr = args !! 0
+                                        in case expr of
+                                          (Atom name) ->  let (evald_expr, state1) = eval expr state
+                                                          in case evald_expr of
+                                                            (Error reason) -> (Error reason, state)
+                                                            (Number n) -> let (evald_expr2, state2) = eval (args !! 1) state1
+                                                                          in case evald_expr2 of
+                                                                            (Error reason) -> (Error reason, state)
+                                                                            (Number k) -> (Number (n + k), (setVar (fst state2) name (Number (n + k)), snd state2))
+                                                                            _ -> (Error ("incf's argument is not a number: " ++ show evald_expr2), state)
+                                                            _ -> (Error ("incf's argument is not a number: " ++ show evald_expr), state)
+                                          _ -> (Error ("first argument is not a variable"), state)
+  | op == "incf" && length args > 2 = (Error "too many arguments to incf", state)
+  | op == "decf" && length args == 0 = (Error "too few arguments to decf", state)
+  | op == "decf" && length args == 1 =  let expr = args !! 0
+                                        in case expr of
+                                          (Atom name) ->  let (evald_expr, state1) = eval expr state
+                                                          in case evald_expr of
+                                                            (Error reason) -> (Error reason, state)
+                                                            (Number n) -> (Number (n - 1), (setVar (fst state1) name (Number (n - 1)), snd state1))
+                                                            _ -> (Error ("decf's argument is not a number: " ++ show evald_expr), state)
+                                          _ -> (Error ("argument is not a variable"), state)
+  | op == "decf" && length args == 2 =  let expr = args !! 0
+                                        in case expr of
+                                          (Atom name) ->  let (evald_expr, state1) = eval expr state
+                                                          in case evald_expr of
+                                                            (Error reason) -> (Error reason, state)
+                                                            (Number n) -> let (evald_expr2, state2) = eval (args !! 1) state1
+                                                                          in case evald_expr2 of
+                                                                            (Error reason) -> (Error reason, state)
+                                                                            (Number k) -> (Number (n - k), (setVar (fst state2) name (Number (n - k)), snd state2))
+                                                                            _ -> (Error ("decf's argument is not a number: " ++ show evald_expr2), state)
+                                                            _ -> (Error ("decf's argument is not a number: " ++ show evald_expr), state)
+                                          _ -> (Error ("first argument is not a variable"), state)
+  | op == "decf" && length args > 2 = (Error "too many arguments to decf", state)
   | op == "-" && length args == 0 = (Error "too few arguments to -", state)
   | op == "-" && length args == 1 = let (evald_arg, state1) = eval (head args) state
                                     in case evald_arg of
@@ -160,6 +231,12 @@ eval (List ((Atom op):args)) state
                       Error reason -> (Error reason, state)
                       List _ -> (Atom "T", state1)
                       _ -> (Atom "nil", state1)
+  | op == "stringp" && length args /= 1 = (Error "stringp accepts only 1 argument", state)
+  | op == "stringp" = let (evald_arg, state1) = eval (head args) state
+                      in case evald_arg of
+                        Error reason -> (Error reason, state)
+                        StringLit _ -> (Atom "T", state1)
+                        _ -> (Atom "nil", state1)
   | op == "null" && length args /= 1 = (Error "null accepts only 1 argument", state)
   | op == "null" =  let (evald_arg, state1) = eval (head args) state
                     in case evald_arg of
@@ -237,6 +314,14 @@ eval (List ((Atom op):args)) state
                     in case evald_arg of
                       Error reason -> (Error reason, state)
                       _ -> eval evald_arg state1
+  | op == "strcat" =  let stringConcat :: [Expr] -> State -> String -> (Expr, State)
+                          stringConcat [] state1 acc = (StringLit acc, state1)
+                          stringConcat (expr:exprs) state1 acc = let (evald_expr, state2) = eval expr state1
+                                                            in case evald_expr of
+                                                              Error reason -> (Error reason, state)
+                                                              StringLit str -> stringConcat exprs state2 (acc ++ str)
+                                                              _ -> (Error ("strcat's argument is not a string: " ++ show evald_expr), state)
+                      in stringConcat args state ""
   | otherwise = (Error "incorrect operation", state)
     where
       arithmeticPredicate :: (Integer -> Integer -> Bool) -> [Expr] -> State -> (Expr, State)

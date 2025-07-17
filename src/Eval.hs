@@ -1,4 +1,4 @@
-module Eval (eval, State) where
+module Eval (eval, State, prettyPrint, exec) where
 
 import Parser (Expr(..))
 import System.Exit
@@ -6,6 +6,7 @@ import System.Exit
 type VarMap = [(String, Expr)]
 type FuncMap = [(String, [String], [Expr])]
 type State = (VarMap, FuncMap)
+type OldVars = [(String, Maybe Expr)]
 
 getVar :: VarMap -> String -> Maybe Expr
 getVar vars name = lookup name vars
@@ -268,6 +269,40 @@ eval (List ((Atom op):args)) state
                     in case evald_arg of
                       Error reason -> (Error reason, state)
                       _ -> eval evald_arg state1
+  | op == "let" =
+    let
+      validateExprs :: [Expr] -> Bool
+      validateExprs [] = True
+      validateExprs ((List [Atom x, _]):xs) = validateExprs xs
+      validateExprs (_:xs) = False
+      
+      validateStructure :: [Expr] -> Bool
+      validateStructure [List exprs, _] = validateExprs exprs 
+      validateStructure _ = False
+
+      iterateExprs :: [Expr] -> OldVars -> VarMap -> (OldVars, VarMap)
+      iterateExprs [] oldVars varMap = (oldVars, varMap)
+      iterateExprs ((List [Atom x, y]):xs) oldVars varMap = 
+        iterateExprs xs ((x, getVar varMap x) : oldVars) (setVar varMap x y)
+      iterateExprs _ _ _ = ([], [])
+
+      restoreVars :: OldVars -> VarMap -> VarMap
+      restoreVars [] x = x
+      restoreVars ((x, Just y):xs) m = restoreVars xs (setVar m x y)
+      restoreVars ((x, Nothing):xs) m = restoreVars xs (delVar m x)
+
+      (varMap, funcMap) = state
+    in
+      case validateStructure args of
+        True ->
+          let
+            [List vars, expr] = args
+            (oldVars, newVars) = iterateExprs vars [] varMap
+            newState = (newVars, funcMap)
+            (res, (evalState, _)) = eval expr newState
+          in
+            (res, (restoreVars oldVars evalState, funcMap))
+        _ -> (Error "Usage: (let ((x 2) (y 3)) (+ x y))", state)
   | otherwise = callFunc op args state
     where
       arithmeticPredicate :: (Integer -> Integer -> Bool) -> [Expr] -> State -> (Expr, State)
@@ -317,3 +352,23 @@ eval (List ((Atom op):args)) state
                                 _ -> (ret_value, state4)
 eval (List _) state = (Error "function name should be a symbol", state)
 -- eval expr state = (Error ("WTF? How did you go here? expr = " ++ show expr), state)
+
+-- EXEC
+prettyPrint :: Expr -> String
+prettyPrint (Atom x) = x
+prettyPrint (Number x) = show x
+prettyPrint (StringLit x) = x
+prettyPrint (Error reason) = "Error: " ++ reason
+prettyPrint (List elems) = "(" ++ go elems ++ ")"
+  where
+    go :: [Expr] -> String
+    go [] = ""
+    go [x] = prettyPrint x
+    go (x:xs) = prettyPrint x ++ " " ++ go xs
+
+exec :: Expr -> State -> IO (Expr, State)
+exec (List [(Atom "print"), expr]) state = do
+  print (prettyPrint expr)
+  return (List [], state)
+exec (List ((Atom "print"):_)) state = pure (Error "Usage: (print (1 2 3))", state)
+exec other state = pure (eval other state)

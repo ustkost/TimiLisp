@@ -362,6 +362,96 @@ eval (List ((Atom op):args)) state
           _ -> do
             putStrLn (prettyPrint evald_arg)
             return (evald_arg, state1)
+  | op == "/" && length args < 2 = return (Error "too few arguments to /", state)
+  | op == "/" = do
+        (first, state1) <- eval (head args) state
+        case first of
+          Error reason -> return (Error reason, state1)
+          Number n -> do
+            let divNums [] state2 acc = return (Number acc, state2)
+                divNums (expr:exprs) state2 acc = do
+                  (evald_expr, state3) <- eval expr state2
+                  case evald_expr of
+                    (Error reason) -> return (Error reason, state3)
+                    (Number 0) -> return (Error "can't divide by 0", state3)
+                    (Number m) -> divNums exprs state3 (acc `div` m)
+                    _ -> return (Error ("/'s argument is not a number: " ++ show evald_expr), state3)
+            divNums (tail args) state1 n
+          _ -> return (Error ("/'s argument is not a number: " ++ show first), state)
+
+  | op == "mod" && length args /= 2 = return (Error "mod requires exactly 2 arguments", state)
+  | op == "mod" = do
+        (first, state1) <- eval (head args) state
+        (second, state2) <- eval (args !! 1) state1
+        case (first, second) of
+          (Number a, Number b) -> 
+            if b == 0 
+              then return (Error "can't divide by 0", state2)
+              else return (Number (a `mod` b), state2)
+          (Error reason, _) -> return (Error reason, state2)
+          (_, Error reason) -> return (Error reason, state2)
+          _ -> return (Error "mod's arguments must be numbers", state2)
+
+  | op == "incf" && length args < 1 = return (Error "too few arguments to incf", state)
+  | op == "incf" && length args > 2 = return (Error "too many arguments to incf", state)
+  | op == "incf" = do
+        let (var:rest) = args
+        case var of
+          Atom name -> do
+            (current, state1) <- eval (Atom name) state
+            case current of
+              Error reason -> return (Error reason, state1)
+              Number n -> do
+                let delta = if null rest then 1 else head rest
+                (dval, state2) <- eval delta state1
+                case dval of
+                  Error reason -> return (Error reason, state2)
+                  Number d -> do
+                    let newVal = n + d
+                    let newState = (setVar (fst state2) name (Number newVal), snd state2)
+                    return (Number newVal, newState)
+                  _ -> return (Error "incf's delta must be a number", state2)
+              _ -> return (Error "incf's variable must contain a number", state1)
+          _ -> return (Error "incf's first argument must be a symbol", state)
+
+  | op == "decf" && length args < 1 = return (Error "too few arguments to decf", state)
+  | op == "decf" && length args > 2 = return (Error "too many arguments to decf", state)
+  | op == "decf" = do
+        let (var:rest) = args
+        case var of
+          Atom name -> do
+            (current, state1) <- eval (Atom name) state
+            case current of
+              Error reason -> return (Error reason, state1)
+              Number n -> do
+                let delta = if null rest then 1 else head rest
+                (dval, state2) <- eval delta state1
+                case dval of
+                  Error reason -> return (Error reason, state2)
+                  Number d -> do
+                    let newVal = n - d
+                    let newState = (setVar (fst state2) name (Number newVal), snd state2)
+                    return (Number newVal, newState)
+                  _ -> return (Error "decf's delta must be a number", state2)
+              _ -> return (Error "decf's variable must contain a number", state1)
+          _ -> return (Error "decf's first argument must be a symbol", state)
+
+  | op == "stringp" && length args /= 1 = return (Error "stringp accepts only 1 argument", state)
+  | op == "stringp" = do
+        (evald_arg, state1) <- eval (head args) state
+        case evald_arg of
+          StringLit _ -> return (Atom "T", state1)
+          _ -> return (Atom "nil", state1)
+
+  | op == "strcat" = do
+        let concatStrings [] state1 acc = return (StringLit acc, state1)
+            concatStrings (expr:exprs) state1 acc = do
+              (evald_expr, state2) <- eval expr state1
+              case evald_expr of
+                StringLit str -> concatStrings exprs state2 (acc ++ str)
+                Error reason -> return (Error reason, state2)
+                _ -> return (Error "strcat's argument is not a string", state2)
+        concatStrings args state ""
   | otherwise = callFunc op args state
     where
       arithmeticPredicate :: (Integer -> Integer -> Bool) -> [Expr] -> State -> IO (Expr, State)

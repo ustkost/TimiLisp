@@ -8,7 +8,7 @@ data Expr
   | StringLit String
   | List [Expr]
   | Error String
-  deriving (Show)
+  deriving (Show, Eq)
 
 parser :: [String] -> [Expr] -> [Expr]
 parser tokens oldExpr

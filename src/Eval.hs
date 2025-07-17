@@ -402,7 +402,7 @@ eval (List ((Atom op):args)) state
             case current of
               Error reason -> return (Error reason, state1)
               Number n -> do
-                let delta = if null rest then 1 else head rest
+                let delta = if null rest then Number 1 else head rest
                 (dval, state2) <- eval delta state1
                 case dval of
                   Error reason -> return (Error reason, state2)
@@ -424,7 +424,7 @@ eval (List ((Atom op):args)) state
             case current of
               Error reason -> return (Error reason, state1)
               Number n -> do
-                let delta = if null rest then 1 else head rest
+                let delta = if null rest then Number 1 else head rest
                 (dval, state2) <- eval delta state1
                 case dval of
                   Error reason -> return (Error reason, state2)

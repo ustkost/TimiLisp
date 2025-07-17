@@ -4,22 +4,28 @@ import Parser (Expr(..))
 import System.Exit
 
 type VarMap = [(String, Expr)]
-type FuncMap = [(String, [String], Expr)]
+type FuncMap = [(String, [String], [Expr])]
 type State = (VarMap, FuncMap)
 
-getVar :: VarMap -> String -> Expr
-getVar vars name = 
-  case lookup name vars of
-    (Just x) -> x
-    (Nothing) -> Error ("variable " ++ name ++ " is not found")
-
+getVar :: VarMap -> String -> Maybe Expr
+getVar vars name = lookup name vars
 setVar :: VarMap -> String -> Expr -> VarMap
 setVar [] name value = [(name, value)]
 setVar (x:xs) name value
   | fst x == name = (name, value):xs
   | otherwise = x:setVar xs name value
+delVar :: VarMap -> String -> VarMap
+delVar [] _ = []
+delVar ((vname, vvalue):vars) name
+  | vname == name = vars
+  | otherwise = (vname, vvalue):delVar vars name
 
-setFunc :: FuncMap -> String -> [String] -> Expr -> FuncMap
+getFunc :: FuncMap -> String -> Maybe ([String], [Expr])
+getFunc [] _ = Nothing
+getFunc ((fname, fargs, fbody):fs) name
+  | fname == name = Just (fargs, fbody)
+  | otherwise = getFunc fs name
+setFunc :: FuncMap -> String -> [String] -> [Expr] -> FuncMap
 setFunc [] name args body = [(name, args, body)]
 setFunc ((a,b,c):fs) name args body
   | a == name = (name, args, body):fs
@@ -27,26 +33,44 @@ setFunc ((a,b,c):fs) name args body
 
 eval :: Expr -> State -> (Expr, State)
 eval (Error x) state = (Error x, state)
-eval (Atom "t") state = (Atom "t", state)
+eval (Atom "T") state = (Atom "T", state)
 eval (Atom "nil") state = (Atom "nil", state)
-eval (Atom s) (vars, funcs) = (getVar vars s, (vars, funcs))
+eval (Atom vname) state = case getVar (fst state) vname of
+  Just value -> (value, state)
+  Nothing -> (Error ("variable " ++ vname ++ " is not defined"), state)
+-- eval (Atom s) (vars, funcs) = (getVar vars s, (vars, funcs))
 eval (Number n) state = (Number n, state)
 eval (StringLit s) state = (StringLit s, state)
 eval (List []) state = (Atom "nil", state)
 eval (List ((Atom op):args)) state
-  {-| op == "exit" && length args == 0 = do
-    exitWith (ExitSuccess)
-    return (Atom "WTF", vars)
-  | op == "exit" && length args == 1 = let (evald_arg, vars1) = eval (head args) vars
+  | op == "defun" && length args < 2 = (Error "defun requires at least 2 arguments: function name and its parameter list", state)
+  | op == "defun" = let (func_name:params:body) = args
+    in case func_name of
+      Error reason -> (Error reason, state)
+      Atom fname -> case params of
+        Error reason -> (Error reason, state)
+        List params_expr -> let getParamStrs :: [Expr] -> [String] -> Maybe [String]
+                                getParamStrs [] names = Just names
+                                getParamStrs (arg:args') names = case arg of
+                                  Error reason -> Nothing
+                                  Atom arg_name -> getParamStrs args' (names ++ [arg_name])
+                                  _ -> Nothing
+                                convd_args = getParamStrs params_expr []
+                            in case convd_args of
+                              Nothing -> (Error "incorrect parameter list", state)
+                              Just names -> let (vars1, funcs1) = state
+                                                state1 = (vars1, setFunc funcs1 fname names body)
+                                            in (Atom fname, state1)
+        _ -> (Error "lambda list is missed", state)
+      _ -> (Error "the name of a function must be a symbol", state)
+  | op == "makunbound" && length args /= 1 = (Error "makunbound accepts only 1 argument", state)
+  | op == "makunbound" = let (evald_arg, state1) = eval (head args) state
     in case evald_arg of
-      Error reason -> (Error reason, vars)
-      Number exitCode -> do
-        exitWith (ExitFailure (fromIntegral exitCode))
-        return (Atom "WTF", vars1)
-      _ -> (Error "exit accepts only 1 numeric argument", vars)
-  | op == "defun" = let
-    in
-  | op == "exit" && length args >= 2 = (Error "exit accepts only 1 numeric argument", vars)-}
+      Error reason -> (Error reason, state)
+      Atom name ->  let (vars1, funcs1) = state1
+                        state2 = (delVar vars1 name, funcs1)
+                    in (evald_arg, state2)
+      _ -> (Error "makeunbound's argument should be a symbol", state)
   | op == "+" = let sumNums :: [Expr] -> State -> Integer -> (Expr, State)
                     sumNums [] state1 acc = (Number acc, state1)
                     sumNums (expr:exprs) state1 acc = let (evald_expr, state2) = eval expr state1
@@ -166,6 +190,12 @@ eval (List ((Atom op):args)) state
                       Error reason -> (Error reason, state)
                       Atom "nil" -> (Atom "T", state1)
                       _ -> (Atom "nil", state1)
+  | op == "symbolp" && length args /= 1 = (Error "symbolp accepts only 1 argument", state)
+  | op == "symbolp" = let (evald_arg, state1) = eval (head args) state
+    in case evald_arg of
+      Error reason -> (Error reason, state)
+      Atom _ -> (Atom "T", state1)
+      _ -> (Atom "nil", state1)
   | op == "quote" && length args /= 1 = (Error "quote accepts only 1 argument", state)
   | op == "quote" = let arg = head args
                     in case arg of
@@ -207,6 +237,7 @@ eval (List ((Atom op):args)) state
                       in case evald_arg of
                         Error reason -> (Error reason, state)
                         Atom "nil" -> (Number 0, state1)
+                        StringLit str -> (Number (fromIntegral (length str)), state1)
                         List lst -> (Number (fromIntegral (length lst)), state1)
                         _ -> (Error "the argument of length shall be a list", state)
   | op == "equal" && length args /= 2 = (Error "equals accepts only 2 arguments", state)
@@ -237,7 +268,7 @@ eval (List ((Atom op):args)) state
                     in case evald_arg of
                       Error reason -> (Error reason, state)
                       _ -> eval evald_arg state1
-  | otherwise = (Error "incorrect operation", state)
+  | otherwise = callFunc op args state
     where
       arithmeticPredicate :: (Integer -> Integer -> Bool) -> [Expr] -> State -> (Expr, State)
       arithmeticPredicate _ [] state1 = (Error "arithmetic predicates require at least 1 argument", state1)
@@ -253,4 +284,36 @@ eval (List ((Atom op):args)) state
                               _ -> (Error "arithmetic predicates accept only numerical arguments", state1)
             in isBE m (tail args) state2
           _ -> (Error "arithmetic predicates accept only numerical arguments", state1)
-eval expr state = (Error ("WTF? How did you go here? expr = " ++ show expr), state)
+      evalBody :: Expr -> [Expr] -> State -> (Expr, State)
+      evalBody initexpr [] state1 = (initexpr, state1)
+      evalBody initexpr (stmt:stmts) state1 = let (evald_stmt, state2) = eval stmt state1
+        in case evald_stmt of
+          Error reason -> (Error reason, state)
+          _ -> evalBody evald_stmt stmts state2
+      callFunc :: String -> [Expr] -> State -> (Expr, State)
+      callFunc fname args' state1 = case getFunc (snd state1) fname of
+        Nothing -> (Error ("undefined function " ++ show fname), state1)
+        Just func ->  let (fargs, fbody) = func
+          in if length fargs /= length args' then (Error ("function " ++ op ++ " requires " ++ show (length fargs) ++ " arguments"), state) else let
+              saved_args = [getVar (fst state1) name | name <- fargs]
+              setArgs :: [String] -> [Expr] -> State -> Maybe State
+              setArgs [] [] state2 = Just state2
+              setArgs (name:names) (value:values) state2 = let (evald_value, state3) = eval value state2
+                in case evald_value of
+                  Error reason -> Nothing
+                  _ -> setArgs names values (setVar (fst state3) name evald_value, snd state3)
+              tmpres = setArgs fargs args' state1
+            in case tmpres of
+              Nothing -> (Error "argument evaluating error", state)
+              Just state2 ->  let (ret_value, state3) = evalBody (Atom "nil") fbody state2
+                                  restoreArgs :: [String] -> [Maybe Expr] -> State -> State
+                                  restoreArgs [] [] state4 = state4
+                                  restoreArgs (name:names) (value:values) state4 = case value of
+                                    Nothing -> (delVar (fst state4) name, snd state4)
+                                    Just value -> (setVar (fst state4) name value, snd state4)
+                                  state4 = restoreArgs fargs saved_args state3
+                              in case ret_value of
+                                Error reason -> (Error reason, state)
+                                _ -> (ret_value, state4)
+eval (List _) state = (Error "function name should be a symbol", state)
+-- eval expr state = (Error ("WTF? How did you go here? expr = " ++ show expr), state)

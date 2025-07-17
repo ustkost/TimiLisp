@@ -1,7 +1,7 @@
 module Repl (repl) where
 import Lexer (lexer)
 import Parser (Expr(..), parser)
-import Eval (exec, State, prettyPrint)
+import Eval (eval, State, prettyPrint)
 
 -- printExprs :: [Expr] -> IO ()
 -- printExprs [] = ()
@@ -16,7 +16,7 @@ repl env = do
   let 
     tokens = lexer input
     expr = parser tokens [] !! 0
-  (res, newEnv) <- exec expr env
+  (res, newEnv) <- eval expr env
   putStrLn (prettyPrint res)
   repl newEnv
 

@@ -182,14 +182,14 @@ eval (List ((Atom op):args)) state
             setVars [name, value] state1 = do
                 (evaluated_value, state2) <- eval value state1
                 case evaluated_value of
-                  (Error x) -> return (Error x, state2)
+                  (Error x) -> return (Error x, state)
                   _ -> case name of
                     (Atom aname) -> return (evaluated_value, (setVar (fst state2) aname evaluated_value, snd state2))
-                    _ -> return (Error "name must be an atom", state2)
+                    _ -> return (Error "name must be an atom", state)
             setVars (name:value:other) state1 = do
                 (v2, state2) <- setVars [name, value] state1
                 case v2 of
-                  Error x -> return (Error x, state2)
+                  Error x -> return (Error x, state)
                   _ -> setVars other state2
         setVars args state
   | op == "atom" && length args /= 1 = return (Error "atom accepts only 1 argument", state)
@@ -323,40 +323,38 @@ eval (List ((Atom op):args)) state
         case evald_arg of
           Error reason -> return (Error reason, state1)
           _ -> eval evald_arg state1
-  | op == "let" = 
+  | op == "let" = do
         let
+          (varMap, funcMap) = state
+
           validateExprs :: [Expr] -> Bool
           validateExprs [] = True
           validateExprs ((List [Atom x, _]):xs) = validateExprs xs
           validateExprs (_:xs) = False
           
           validateStructure :: [Expr] -> Bool
-          validateStructure [List exprs, _] = validateExprs exprs 
+          validateStructure [List exprs, expr] = validateExprs exprs
           validateStructure _ = False
 
-          iterateExprs :: [Expr] -> OldVars -> VarMap -> (OldVars, VarMap)
-          iterateExprs [] oldVars varMap = (oldVars, varMap)
-          iterateExprs ((List [Atom x, y]):xs) oldVars varMap = 
-            iterateExprs xs ((x, getVar varMap x) : oldVars) (setVar varMap x y)
-          iterateExprs _ _ _ = ([], [])
+          iterateExprs :: [Expr] -> OldVars -> VarMap -> State -> IO (OldVars, VarMap)
+          iterateExprs [] oldVars varMap _ = return (oldVars, varMap)
+          iterateExprs ((List [Atom name, value]):xs) oldVars varMap state = do
+            (evald_arg, newState) <- (eval value (varMap, funcMap))
+            iterateExprs xs ((name, getVar varMap name) : oldVars) (setVar varMap name evald_arg) newState
+          iterateExprs _ _ _ _ = return ([], [])
 
           restoreVars :: OldVars -> VarMap -> VarMap
           restoreVars [] x = x
           restoreVars ((x, Just y):xs) m = restoreVars xs (setVar m x y)
           restoreVars ((x, Nothing):xs) m = restoreVars xs (delVar m x)
 
-          (varMap, funcMap) = state
-        in
-          if validateStructure args
-            then
-              let
-                [List vars, expr] = args
-                (oldVars, newVars) = iterateExprs vars [] varMap
-                newState = (newVars, funcMap)
-              in do
-                (res, (evalState, _)) <- eval expr newState
-                return (res, (restoreVars oldVars evalState, funcMap))
-            else return (Error "Usage: (let ((x 2) (y 3)) (+ x y))", state)
+        if validateStructure args then do
+          let [List vars, expr] = args
+          (oldVars, newVars) <- iterateExprs vars [] varMap state
+          (res, (evalState, _)) <- eval expr (newVars, funcMap)
+          return (res, (restoreVars oldVars evalState, funcMap))
+        else
+          return (Error "Usage: (let ((x 2) (y 3)) (+ x y))", state)
   | op == "print" && length args /= 1 = return (Error "print requires exactly 1 argument", state)
   | op == "print" = do
         (evald_arg, state1) <- eval (head args) state

@@ -64,6 +64,17 @@ eval (List ((Atom op):args)) state
                                             in (Atom fname, state1)
         _ -> (Error "lambda list is missed", state)
       _ -> (Error "the name of a function must be a symbol", state)
+  | op == "apply" && length args /= 2 = (Error "apply requires exactly 2 arguments", state)
+  | op == "apply" = let [fname_expr, fargs_expr] = args
+                        (evald_fname, state1) = eval fname_expr state
+    in case evald_fname of
+      Error reason -> (Error reason, state)
+      Atom fname -> let (evald_fargs, state2) = eval fargs_expr state1
+        in case evald_fargs of
+          Error reason -> (Error reason, state)
+          List fargs -> callFunc fname fargs state2
+          _ -> (Error "function arguments in apply should be a list", state)
+      _ -> (Error "function name in apply should be a symbol", state)
   | op == "makunbound" && length args /= 1 = (Error "makunbound accepts only 1 argument", state)
   | op == "makunbound" = let (evald_arg, state1) = eval (head args) state
     in case evald_arg of
@@ -138,7 +149,8 @@ eval (List ((Atom op):args)) state
                             in case evald_cond of
                               Error reason -> (Error reason, state)
                               (Atom "nil") -> condExpr cond_lists state2
-                              _ ->  let runStmts :: [Expr] -> State -> (Expr, State)
+                              _ -> evalBody evald_cond cond_stmts state
+                              {-_ ->  let runStmts :: [Expr] -> State -> (Expr, State)
                                         runStmts [] state3 = (evald_cond, state3)
                                         runStmts [stmt] state3 = let (evald_stmt, state4) = eval stmt state
                                           in case evald_stmt of
@@ -148,7 +160,7 @@ eval (List ((Atom op):args)) state
                                           in case evald_stmt of
                                             Error reason -> (Error reason, state)
                                             _ -> runStmts stmts state4
-                                    in runStmts cond_stmts state2
+                                    in runStmts cond_stmts state2-}
                           _ -> (Error "cond arguments should be lists", state)
     in condExpr args state
   | op == "setf" && odd (length args) = (Error "the number of setf's arguments must be odd", state)
@@ -209,6 +221,20 @@ eval (List ((Atom op):args)) state
                                                                   Error reason -> (Error reason, state)
                                                                   _ -> joinArgs args' state2 (List (lst ++ [evald_arg]))
                     in joinArgs args state (List [])
+  | op == "append" = let  joinLists :: [Expr] -> [Expr] -> State -> (Expr, State)
+                          joinLists acc [] state1 = (List acc, state1)
+                          joinLists acc (lst:lsts) state1 = let (evald_lst, state2) = eval lst state1
+                            in case evald_lst of
+                              Error reason -> (Error reason, state)
+                              List lst -> joinLists (acc ++ lst) lsts state2
+                              Atom "nil" -> joinLists acc lsts state2
+                              _ -> (Error "append arguments should be lists", state)
+                          (res, state1) = joinLists [] args state
+    in case res of
+      Error reason -> (Error reason, state)
+      List [] -> (Atom "nil", state1)
+      List lst -> (List lst, state1)
+      _ -> (Error ("WTF? Result of append is not a list: " ++ show res), state)
   | op == "car" && length args /= 1 = (Error "car accepts only 1 argument", state)
   | op == "car" = let (evald_arg, state1) = eval (head args) state
                   in case evald_arg of

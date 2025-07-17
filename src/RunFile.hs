@@ -12,28 +12,31 @@ runFile name = do
   content <- readFile name
   let
     lines = splitOn "\n" content
-  execute lines ([], [])
+  execute lines ([], []) 1
     where
-      execute :: [String] -> State -> IO ()
-      execute [] state = return ()
-      execute (x:xs) state = do
-        newState <- runLine x state
-        execute xs newState
+      -- Integer потому что у нас амбициозный интерпрeтатор (от Искандера)
+      execute :: [String] -> State -> Integer -> IO ()
+      execute [] state num = return ()
+      execute (x:xs) state num = do
+        newState <- runLine x state num
+        case newState of
+          Just newState -> execute xs newState (num + 1)
+          Nothing -> return ()
 
-runLine :: String -> State -> IO (State)
-runLine line state = do
+runLine :: String -> State -> Integer -> IO (Maybe State)
+runLine line state num = do
   let
     tokens = lexer line 
     exprs = parser tokens []
 
   run exprs state
     where
-      run :: [Expr] -> State -> IO (State)
-      run [] state = return state
+      run :: [Expr] -> State -> IO (Maybe State)
+      run [] state = return (Just state)
       run (x:xs) state = do
         (res, newState) <- eval x state
         case res of
           Error reason -> do
-            print reason
-            return state
+            print ("Line " ++ show num ++ ": " ++ reason)
+            return Nothing 
           _ -> run xs newState

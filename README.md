@@ -35,3 +35,6 @@ defun, apply, makunbound, +, *, -, =, >=, >, <, <=, /=, and, or, cond, setf, ato
 ```
 
 we have demo program `a.tl` in the repository to demonstrate language
+
+this is just image with random functions we support
+![repl](./showcase.png)

@@ -1,15 +1,12 @@
 cabal-version:       2.2
 
 name:                timilisp
-version:             0.1.0.0
--- synopsis:
--- description:
+version:             0.2.0.0
 homepage:            https://github.com/githubuser/timilisp#readme
 license:             BSD-3-Clause
 license-file:        LICENSE
-author:              Author name here
-maintainer:          example@example.com
-copyright:           2025 Author name here
+author:              Timur Chumaraev, Konstantin Ustiuzhanin, Kutlahmetov Iskander
+maintainer:          t.chumaraev@innopolis.university
 category:            Web
 build-type:          Simple
 extra-source-files:  README.md

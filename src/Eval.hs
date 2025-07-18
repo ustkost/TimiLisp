@@ -1,8 +1,6 @@
 module Eval (eval, State, prettyPrint) where
 
 import Parser (Expr(..))
-import System.Exit
-import Control.Monad (foldM)
 
 type VarMap = [(String, Expr)]
 type FuncMap = [(String, [String], [Expr])]

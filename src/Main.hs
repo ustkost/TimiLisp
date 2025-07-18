@@ -8,6 +8,8 @@ main :: IO ()
 main = do
   args <- getArgs
   case args of
-    [] -> repl ([], [])
+    [] -> do
+      putStrLn "TimiLisp REPL"
+      repl ([], [])
     [filename] -> runFile filename
     _ -> putStrLn "Run without arguments for repl or pass file path to execute"

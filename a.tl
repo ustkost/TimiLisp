@@ -1,5 +1,5 @@
 (defun len (lst) (cond ((null lst) 0) (T (+ 1 (len (cdr lst))))))
-(print (len (list 1 2 3))) "3"
+(print (len (list 1 2 3)))
 
 (defun rev (lst) (and lst (append (rev (cdr lst)) (list (car lst))))) "Reversing list"
 (print (rev (list () 1 1 (list 1 4 8))))

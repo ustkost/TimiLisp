@@ -32,7 +32,7 @@ parser tokens oldExpr
         | x == ")" = (List e, xs)
         | otherwise = processList new_tokens' (e ++ [convertedToken2])
           where
-            x:xs = lst'
+            (x:xs) = lst'
             convertedToken2
               | x == "(" = fst (processList xs [])
               | isStringANumber x = Number (read x) 

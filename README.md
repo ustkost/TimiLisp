@@ -1,23 +1,37 @@
 # timilisp
 
-короче запустить это: runhaskell src/Main.hs
-и там интерпретатор запустится (просьба не совершать ошибки, он ломается)
-мы там сделали много чего попробуйте (ДАЖЕ ПЕРЕМЕННЫЕ ЕСТЬ!)
-
-только не судите строго, это первая версия, но мы очень старались, правда
-кстати Искандер хоть ни одного коммита не отправил, но он сформулировал то, как будут работать парсер и эвал
-короче помог сильно
-
-мы потом еще много всего сделаем наверное
-
-тут вот картинка нашего прекрасного диалекта названного в честь тимура
-(![timilispik](./kartinka.png))
-
-Наш интерпретатор уже полон по Тьюрингу. Пример расчета факториала:
+running:
+```sh
+stack build
+stack run # for repl
+stack run <file> # to execute file
 ```
-(setf x (quote (cond ((> n 0) (* (+ (setf n (- n 1)) 1) (eval x))) (t 1))))
-(setf n 5)
-(eval x)
-120
+for some reason running with stack does weird output in REPL so I recommend using `runhaskell` to run it:
 ```
-Юху
+cd src
+runhaskell Main.hs
+```
+
+stage2 extra features:
+
+- Timur Chumaraev: 
+  ```
+  implemented functions stringp, /, mod, incf, decf, strcat.
+  ```
+
+- Konstantin Ustiuzhanin:
+  ```
+  implemented let, print functions, changed code to support IO, added option to run code from file instead of repl, better error messages
+  ```
+
+- Iskander Kutlahmetov: 
+  ```
+  added support for user-defined function, rewrited eval function, added functions: defun, apply, makunbound, >=,    >, <, <=, /=, and, or, cond, append, length, equal, error, eval
+  ```
+
+supported functions list:
+```
+defun, apply, makunbound, +, *, -, =, >=, >, <, <=, /=, and, or, cond, setf, atom, numberp, listp, null, symbolp, qoute, list, append, car, cdr, cons, length, equal, error, eval, let, print, /, mod, incf, decf, stringp, strcat
+```
+
+we have demo program `a.tl` in the repository to demonstrate language
